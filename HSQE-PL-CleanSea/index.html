@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>INTEGRA · Módulo HSQE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/CS.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app" style="display:none;">
+
+  <div id="printReport"></div>
+  <datalist id="personasDatalist"></datalist>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div id="brandLogo"></div>
+      <div class="name">INTEGRA</div>
+      <div class="sub">Módulo HSQE</div>
+    </div>
+    <div class="company-select" style="padding-top:12px;">
+      <label style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:5px;padding-left:2px;">Sitio / Buque</label>
+      <select id="siteFilter" onchange="setSiteFilter(this.value)"></select>
+    </div>
+    <div class="nav-section" id="typeNav"></div>
+    <div class="nav-section" style="margin-top:auto;">
+      <div class="nav-label">Configuración</div>
+      <div class="nav-item" onclick="openCatalogManager()">⚙ Gestionar catálogos</div>
+      <div class="nav-item" id="printReportBtn" onclick="printCompanyReport()">🖨 Reporte PDF por sitio</div>
+      <div class="nav-item" onclick="exportData()">⬇ Exportar datos (JSON)</div>
+      <div class="nav-item" onclick="refreshData()">↻ Actualizar datos</div>
+    </div>
+    <div class="session-block">
+      <div class="session-email" id="sessionEmail"></div>
+      <div class="session-actions">
+        <a class="session-btn" href="https://integra.terra-mare.com.ar">← Grupo PL</a>
+        <button class="session-btn" onclick="logoutHsqe()">Cerrar sesión</button>
+      </div>
+      <div class="session-version">MÓDULO HSQE v1.0</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="viewTitle">Panel General</h1>
+        <div class="meta" id="viewMeta">—</div>
+      </div>
+      <button class="btn" onclick="openRecordForm()">+ Nuevo registro</button>
+    </div>
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div id="chartsSectionLabel" style="font-family:'Montserrat';font-size:15px;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;"></div>
+      <button class="btn secondary" onclick="printChartsReport()">🖨 Imprimir gráficos (PDF)</button>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card"><h3 id="chartTitle1">Registros por tipo</h3><canvas id="chartTipo"></canvas></div>
+      <div class="chart-card"><h3 id="chartTitle2">Por estado</h3><canvas id="chartEstado"></canvas></div>
+      <div class="chart-card"><h3 id="chartTitle3">Por empresa</h3><canvas id="chartEmpresa"></canvas></div>
+      <div class="chart-card" id="chartCardCausa"><h3 id="chartTitle4">Por causa raíz</h3><canvas id="chartCausa"></canvas></div>
+    </div>
+
+    <div id="ocimfKpiPanel" style="display:none;margin-bottom:22px;">
+      <div class="chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <h3 style="margin:0;">KPI OCIMF — Frecuencia de Lesiones (Marine Injury Guideline)</h3>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:11px;color:var(--graphite);display:flex;align-items:center;gap:4px;">Desde
+              <input type="date" id="ocimfDesde" onchange="renderOcimfKpi()">
+            </label>
+            <label style="font-size:11px;color:var(--graphite);display:flex;align-items:center;gap:4px;">Hasta
+              <input type="date" id="ocimfHasta" onchange="renderOcimfKpi()">
+            </label>
+          </div>
+        </div>
+        <div class="kpi-row" id="ocimfKpiRow" style="margin-bottom:10px;"></div>
+        <div id="ocimfExposureInfo" style="font-size:11px;color:var(--graphite-light);"></div>
+      </div>
+    </div>
+
+    <div id="auditNcKpiPanel" style="display:none;margin-bottom:22px;">
+      <div class="chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <h3 style="margin:0;">KPI — No Conformidades en Auditorías ISM / ISO</h3>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:11px;color:var(--graphite);display:flex;align-items:center;gap:4px;">Desde
+              <input type="date" id="auditNcDesde" onchange="renderAuditNcKpi()">
+            </label>
+            <label style="font-size:11px;color:var(--graphite);display:flex;align-items:center;gap:4px;">Hasta
+              <input type="date" id="auditNcHasta" onchange="renderAuditNcKpi()">
+            </label>
+          </div>
+        </div>
+        <div class="kpi-row" id="auditNcKpiRow"></div>
+        <div id="auditNcInfo" style="font-size:11px;color:var(--graphite-light);margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="searchBox" placeholder="Buscar por descripción, área, responsable..." oninput="renderTable()">
+      <select id="statusFilter" onchange="renderTable()">
+        <option value="">Todos los estados</option>
+        <option>Abierta</option><option>En Progreso</option><option>Cerrada</option>
+      </select>
+      <select id="sevFilter" onchange="renderTable()">
+        <option value="">Toda severidad</option>
+        <option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option>
+      </select>
+      <select id="overdueFilter" onchange="renderTable()">
+        <option value="">Todos los vencimientos</option>
+        <option value="overdue">Solo vencidas</option>
+      </select>
+      <button class="btn secondary" onclick="clearFilters()">Limpiar filtros</button>
+    </div>
+
+    <div id="tableWrap"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
