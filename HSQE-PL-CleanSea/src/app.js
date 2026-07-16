@@ -156,9 +156,9 @@ let charts = {};
 async function loadData(){
   try{
     const [regRes, catRes, cfgRes] = await Promise.all([
-      supabase.from('hsqe_registros').select('data').order('fecha', { ascending: false }),
-      supabase.from('hsqe_catalogos').select('data').eq('id', 1).maybeSingle(),
-      supabase.from('hsqe_config').select('data').eq('id', 1).maybeSingle(),
+      supabase.from('hsqe_cs_registros').select('data').order('fecha', { ascending: false }),
+      supabase.from('hsqe_cs_catalogos').select('data').eq('id', 1).maybeSingle(),
+      supabase.from('hsqe_cs_config').select('data').eq('id', 1).maybeSingle(),
     ]);
     if(regRes.error) throw regRes.error;
     if(catRes.error) throw catRes.error;
@@ -194,7 +194,7 @@ async function upsertRegistro(rec){
       data: rec,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from('hsqe_registros').upsert(row);
+    const { error } = await supabase.from('hsqe_cs_registros').upsert(row);
     if(error) throw error;
     return true;
   }catch(e){
@@ -206,7 +206,7 @@ async function upsertRegistro(rec){
 
 async function deleteRegistroRow(id){
   try{
-    const { error } = await supabase.from('hsqe_registros').delete().eq('id', id);
+    const { error } = await supabase.from('hsqe_cs_registros').delete().eq('id', id);
     if(error) throw error;
     return true;
   }catch(e){
@@ -218,7 +218,7 @@ async function deleteRegistroRow(id){
 
 async function saveCatalogos(){
   try{
-    const { error } = await supabase.from('hsqe_catalogos')
+    const { error } = await supabase.from('hsqe_cs_catalogos')
       .upsert({ id: 1, data: DATA.catalogos, updated_at: new Date().toISOString() });
     if(error) throw error;
     return true;
@@ -231,7 +231,7 @@ async function saveCatalogos(){
 
 async function saveConfig(){
   try{
-    const { error } = await supabase.from('hsqe_config')
+    const { error } = await supabase.from('hsqe_cs_config')
       .upsert({ id: 1, data: { companies: DATA.companies, scorecardTargets: DATA.scorecardTargets, visadores: DATA.visadores }, updated_at: new Date().toISOString() });
     if(error) throw error;
     return true;
