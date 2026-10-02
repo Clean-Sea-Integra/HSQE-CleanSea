@@ -13,7 +13,7 @@ function showLoading() {
   const el = document.createElement('div');
   el.className = 'login-loading';
   el.id = 'authLoading';
-  el.textContent = 'Cargando...';
+  el.textContent = 'Cargando';
   root.appendChild(el);
 }
 
@@ -30,28 +30,37 @@ function showLogin(message) {
   wrap.className = 'login-page';
   wrap.id = 'authLogin';
   wrap.innerHTML = `
-    <div class="login-bg-lines"></div>
-    <div class="login-card">
-      <div class="login-brand">
-        <img src="/CS.png" alt="Clean Sea" />
-        <div>
-          <div class="login-brand-name">Clean Sea</div>
-          <div class="login-brand-sub">INTEGRA · HSQE</div>
+    <div class="login-left">
+      <div class="login-left-integra-wrap">
+        <img src="/integra-logo-white-noclaim.svg" alt="INTEGRA" class="login-left-integra-img" />
+      </div>
+      <div>
+        <div class="login-left-divider"></div>
+        <div class="login-left-company">
+          <img src="/brand/CleanSea_Blanco.webp" alt="Clean Sea" class="login-left-company-logo" />
+          <div class="login-left-company-name">Clean Sea | HSQE</div>
         </div>
+        <div class="login-left-line"></div>
+        <div class="login-left-sub">Health · Safety · Quality · Environment</div>
       </div>
-      <div class="login-title">Acceso al módulo HSQE</div>
-      <div class="login-sub">Solo personal autorizado</div>
-      <div class="login-error" id="loginError">${message || ''}</div>
-      <div class="login-fg">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" placeholder="usuario@cleansea.com.ar" autocomplete="username" autofocus />
+    </div>
+    <div class="login-right">
+      <div class="login-card">
+        <div class="login-card-eyebrow">Clean Sea | HSQE</div>
+        <div class="login-card-title">Acceso al módulo HSQE</div>
+        <div class="login-card-sub">Solo personal autorizado</div>
+        <div class="login-error" id="loginError">${message || ''}</div>
+        <div class="login-fg">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="usuario@cleansea.com.ar" autocomplete="username" autofocus />
+        </div>
+        <div class="login-fg">
+          <label for="loginPass">Contraseña</label>
+          <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <button class="login-btn" id="loginBtn">Ingresar →</button>
+        <div class="login-footer">Clean Sea · HSQE · Confidencial</div>
       </div>
-      <div class="login-fg">
-        <label for="loginPass">Contraseña</label>
-        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
-      </div>
-      <button class="login-btn" id="loginBtn">Ingresar →</button>
-      <div class="login-footer">Clean Sea · Acceso restringido</div>
     </div>`;
   root.appendChild(wrap);
 
