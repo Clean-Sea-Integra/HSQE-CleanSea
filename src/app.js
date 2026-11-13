@@ -642,7 +642,8 @@ function setSiteFilter(v){ currentSiteFilter = v; renderAll(); }
 // Orden y agrupación del menú lateral de categorías
 const NAV_GROUP_HALLAZGOS = ['NC','OBS','OM'];
 const NAV_GROUP_EVENTOS = ['INC','ACC','CUA','LA'];
-const NAV_ORDER_PROACTIVOS = ['AI','CI','SUG','RP'];
+// Sugerencia de Mejora (SUG) se quitó del menú y de los registros nuevos (los existentes siguen editables).
+const NAV_ORDER_PROACTIVOS = ['AI','CI','RP'];
 const NAV_GROUP_CAPACITACION = ['CAP'];
 const NAV_GROUP_AUDITORIAS = ['AUD','INSP'];
 const NAV_GROUP_TAREAS_ISO = ['TISO'];
@@ -670,7 +671,7 @@ function renderTypeNav(){
   // Tareas ISO/ISM no se mezcla en el total de "Todos los registros" (queda solo en su sección).
   html += navItem('ALL', 'Todos los registros', navDotColor('ALL'), filtered.filter(r=>!fueraDeTodos(r.tipo)).length);
   // INFORMES (F5-001 Derrame / F5-002 Simulacro / F5-004 Salvamento) — antes de Auditorías / Inspecciones
-  html += label('Informes', 12) + INFORME_TIPOS.map(k => navItem(k, `${INFORME_DEF[k].codigo} ${INFORME_DEF[k].corto}`, INFORME_DEF[k].color, count(k))).join('');
+  html += label('Informes', 12) + INFORME_TIPOS.map(k => navItem(k, INFORME_DEF[k].corto, INFORME_DEF[k].color, count(k))).join('');
   html += label('Auditorías / Inspecciones', 12) + group(NAV_GROUP_AUDITORIAS);
   html += label('Hallazgos', 12) + group(NAV_GROUP_HALLAZGOS);
   html += label('Reporte de Eventos', 12) + group(NAV_GROUP_EVENTOS);
@@ -1761,7 +1762,7 @@ function openRecordForm(id, forceTipo){
         <div class="section-title">Clasificación</div>
         <div class="field-row">
           <div class="field"><label>Tipo de evento</label>
-            <select id="f_tipo">${Object.keys(TYPES).filter(k=>!esInforme(k) && (k!=='PROG' || tipo==='PROG') && (k!=='TISO' || usuarioActualPuedeVisar())).map(k=>`<option value="${k}" ${k===tipo?'selected':''}>${TYPES[k].label}</option>`).join('')}</select>
+            <select id="f_tipo">${Object.keys(TYPES).filter(k=>!esInforme(k) && (k!=='SUG' || tipo==='SUG') && (k!=='PROG' || tipo==='PROG') && (k!=='TISO' || usuarioActualPuedeVisar())).map(k=>`<option value="${k}" ${k===tipo?'selected':''}>${TYPES[k].label}</option>`).join('')}</select>
           </div>
           <div class="field"><label>Cliente / Operación</label>
             <select id="f_cliente">${clienteOptionsHtml(r ? r.cliente_operacion : 'No Asignado a Cliente')}</select>
@@ -4418,7 +4419,7 @@ export function initApp(session){
     getData: () => DATA,
     getSiteFilter: () => currentSiteFilter,
     getUser: () => CURRENT_USER,
-    upsertRegistro, deleteRegistroRow, showToast, uid, todayISO, codigoMostrado, esCerrado,
+    upsertRegistro, deleteRegistroRow, showToast, uid, todayISO, codigoMostrado, esCerrado, generateRecordId,
     clientesDisponibles, getCompanyLogo, logoToDataURL, renderAll,
     puedeVisar: usuarioActualPuedeVisar,
   });

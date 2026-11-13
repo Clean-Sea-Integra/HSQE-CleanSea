@@ -50,9 +50,19 @@ const LISTAS = {
   invitados:           { add: '+ Agregar invitado',  cols: [{ k: 'nombre', ph: 'Nombre y apellido' }, { k: 'funcion', ph: 'Función' }, { k: 'institucion', ph: 'Institución', list: 'infInstitucionesDL' }] },
   seguridad_lugar:     { add: '+ Agregar condición', cols: [{ k: 'texto', ph: 'Condición del lugar' }] },
   resultados:          { add: '+ Agregar resultado', cols: [{ k: 'texto', ph: 'Resultado', type: 'textarea' }] },
-  fortalezas:          { add: '+ Agregar fortaleza', cols: [{ k: 'texto', ph: 'Fortaleza observada', type: 'textarea' }] },
-  mejoras:             { add: '+ Agregar oportunidad', cols: [{ k: 'texto', ph: 'Oportunidad de mejora', type: 'textarea' }] },
+  fortalezas:          { add: '+ Agregar fortaleza', cols: [{ k: 'texto', ph: 'Fortaleza observada', type: 'textarea' }, { k: 'genera', type: 'genera', w: '200px' }] },
+  mejoras:             { add: '+ Agregar oportunidad', cols: [{ k: 'texto', ph: 'Oportunidad de mejora', type: 'textarea' }, { k: 'genera', type: 'genera', w: '200px' }] },
 };
+
+// Evaluación (11): cada ítem puede quedar solo como texto del informe o generar un registro
+// para su seguimiento en la sección correspondiente del ERP.
+const GENERA_OPCIONES = [
+  { v: '',   l: 'Solo texto del informe' },
+  { v: 'OM', l: 'Oportunidad de Mejora' },
+  { v: 'LA', l: 'Lección Aprendida' },
+  { v: 'RP', l: 'Reporte Positivo' },
+];
+const GENERA_LABEL = { OM: 'Oportunidad de Mejora', LA: 'Lección Aprendida', RP: 'Reporte Positivo' };
 
 let ctx = null;         // funciones/estado compartidos que provee app.js
 let F = null;           // informe en edición
@@ -80,6 +90,8 @@ function fechaLarga(d){
 }
 function vacio(item){ return !Object.values(item || {}).some(v => String(v == null ? '' : v).trim()); }
 function nuevoItem(key){ const o = {}; LISTAS[key].cols.forEach(c => { o[c.k] = c.type === 'select' ? c.options[0] : ''; }); return o; }
+// "vacío" para limpiar listas: el selector de registro no cuenta como contenido.
+function itemSinTexto(it){ const { genera, rec_id, sync_texto, ...resto } = it || {}; return vacio(resto); }
 
 /* ============ setup ============ */
 export function setupInformes(context){
@@ -87,7 +99,7 @@ export function setupInformes(context){
   Object.assign(window, {
     openInformeForm, closeInformeForm, infSet, infSetItem, infAddItem, infRemoveItem, infMoveItem,
     infUploadFotos, infUploadFotoUbicacion, infRemoveFotoUbicacion, infSetFotoEpigrafe, infRemoveFoto, infMoveFoto,
-    saveInforme, deleteInforme, previewInforme, infPanelSearch, infPanelYear, infChangeTipo,
+    saveInforme, deleteInforme, previewInforme, infPanelSearch, infPanelYear, infChangeTipo, infSetGenera,
   });
 }
 
@@ -102,7 +114,7 @@ export function renderInformesPanel(tipo){
     panel.style.marginBottom = '22px';
     document.querySelector('.main').appendChild(panel);
   }
-  document.getElementById('viewTitle').textContent = `${def.codigo} · ${def.label}`;
+  document.getElementById('viewTitle').textContent = def.label;
   const site = ctx.getSiteFilter();
   let list = DATA.records.filter(r => r.tipo === tipo && (site === 'ALL' || r.instalacion === site));
   const years = [...new Set(list.map(r => (r.fecha || '').slice(0, 4)).filter(Boolean))].sort().reverse();
@@ -111,7 +123,7 @@ export function renderInformesPanel(tipo){
   const q = panelSearch.trim().toLowerCase();
   if(q) list = list.filter(r => `${r.titulo} ${r.ubicacion} ${r.cliente_operacion} ${r.instalacion} ${ctx.codigoMostrado(r)}`.toLowerCase().includes(q));
   list.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.id || '').localeCompare(a.id || ''));
-  document.getElementById('viewMeta').textContent = `${site === 'ALL' ? 'Todos los sitios' : site} · ${list.length} informe(s)`;
+  document.getElementById('viewMeta').textContent = `Formulario ${def.codigo} · ${site === 'ALL' ? 'Todos los sitios' : site} · ${list.length} informe(s)`;
 
   const finalizados = list.filter(r => ctx.esCerrado(r.estado)).length;
   const rows = list.map(r => {
@@ -239,6 +251,16 @@ function renderListaHtml(key){
       const on = `oninput="infSetItem('${key}',${i},'${c.k}',this.value)"`;
       const st = `style="${c.w ? `flex:0 0 ${c.w};width:${c.w};` : 'flex:1;min-width:140px;'}"`;
       if(c.type === 'textarea') return `<textarea ${on} ${st} placeholder="${esc(c.ph || '')}" rows="2" style="${c.w ? `flex:0 0 ${c.w};` : 'flex:1;min-width:160px;'}min-height:38px;">${esc(v)}</textarea>`;
+      if(c.type === 'genera'){
+        const hijo = it.rec_id ? ctx.getData().records.find(x => x.id === it.rec_id) : null;
+        const estado = hijo
+          ? `<span class="inf-gen ok" title="Registro creado para seguimiento">✔ ${esc(GENERA_LABEL[hijo.tipo] || hijo.tipo)} ${esc(ctx.codigoMostrado(hijo))}</span>`
+          : (v ? `<span class="inf-gen">Se creará al guardar</span>` : '');
+        return `<div style="flex:0 0 ${c.w};width:${c.w};display:flex;flex-direction:column;gap:3px;">
+          <select onchange="infSetGenera('${key}',${i},this.value)" title="Registrar como">${GENERA_OPCIONES.map(o => `<option value="${o.v}" ${o.v === (v || '') ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select>
+          ${estado}
+        </div>`;
+      }
       if(c.type === 'select') return `<select onchange="infSetItem('${key}',${i},'${c.k}',this.value)" ${st}>${[...new Set([...c.options, v].filter(Boolean))].map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
       return `<input type="${c.type || 'text'}" value="${esc(v)}" ${on} ${st} placeholder="${esc(c.ph || '')}" ${c.list ? `list="${c.list}"` : ''}>`;
     }).join('');
@@ -259,7 +281,7 @@ function renderListaHtml(key){
 function listaHtml(key){ return `<div id="infWrap_${key}">${renderListaHtml(key)}</div>`; }
 function colLabel(key, c){
   const L = { titulo: 'Título', descripcion: 'Descripción', hora: 'Hora', item: 'Ítem', caracteristicas: 'Características', cantidad: 'Cantidad',
-    um: 'UM', cargo: 'Cargo', nombre: 'Nombre', inicio: 'Inicio', fin: 'Final', funcion: 'Función', institucion: 'Institución', texto: '' };
+    um: 'UM', genera: 'Registrar como', cargo: 'Cargo', nombre: 'Nombre', inicio: 'Inicio', fin: 'Final', funcion: 'Función', institucion: 'Institución', texto: '' };
   return L[c.k] != null ? L[c.k] : c.k;
 }
 function rerenderLista(key){
@@ -439,6 +461,19 @@ function infChangeTipo(t){
   if(h) h.textContent = `${F.id ? 'Editar' : 'Nuevo'} ${INFORME_DEF[t].label}`;
 }
 function infSetItem(key, i, campo, v){ if(F && F[key] && F[key][i]) F[key][i][campo] = v; }
+function infSetGenera(key, i, v){
+  const it = F && F[key] && F[key][i];
+  if(!it) return;
+  const hijo = it.rec_id ? ctx.getData().records.find(x => x.id === it.rec_id) : null;
+  if(hijo && v !== hijo.tipo){
+    if(!confirm(`Este ítem ya generó ${GENERA_LABEL[hijo.tipo] || hijo.tipo} ${ctx.codigoMostrado(hijo)}. Ese registro se mantiene; si cambiás el tipo, al guardar se creará uno nuevo. ¿Continuar?`)){
+      rerenderLista(key); return;
+    }
+    it.rec_id = ''; it.sync_texto = '';
+  }
+  it.genera = v;
+  rerenderLista(key);
+}
 function infAddItem(key){
   const it = nuevoItem(key);
   if(key === 'personal'){ it.inicio = F.fecha || ''; it.fin = F.fecha_fin || F.fecha || ''; }
@@ -617,7 +652,66 @@ async function cargarThumbs(scope){
 
 /* ============ GUARDAR / ELIMINAR ============ */
 function limpiarListas(r){
-  Object.keys(LISTAS).forEach(k => { r[k] = (r[k] || []).filter(it => !vacio(it)); });
+  Object.keys(LISTAS).forEach(k => { r[k] = (r[k] || []).filter(it => !itemSinTexto(it)); });
+}
+
+// Crea (o actualiza) los registros OM / LA / RP pedidos desde la Evaluación del informe.
+// Devuelve la lista de registros a guardar. Los registros generados quedan vinculados al
+// informe (origen_registro_id) y el ítem guarda su id (rec_id).
+function sincronizarEvaluacion(rec){
+  const DATA = ctx.getData();
+  const def = INFORME_DEF[rec.tipo];
+  const codigo = ctx.codigoMostrado(rec);
+  const aGuardar = [];
+  ['fortalezas', 'mejoras'].forEach(key => {
+    (rec[key] || []).forEach(it => {
+      const tipo = it.genera;
+      const texto = (it.texto || '').trim();
+      if(!GENERA_LABEL[tipo] || !texto) return;
+      const origen = `Origen: ${def.label} ${codigo} — ${rec.titulo || ''}`.trim();
+      const existente = it.rec_id ? DATA.records.find(x => x.id === it.rec_id && x.tipo === tipo) : null;
+      if(existente){
+        // Solo se actualiza si el texto cambió en el informe (no pisa ediciones hechas en el registro).
+        if(it.sync_texto !== texto){
+          existente.titulo = texto.split('\n')[0].slice(0, 120);
+          existente.descripcion = `${texto}\n\n${origen}`;
+          it.sync_texto = texto;
+          aGuardar.push(existente);
+        }
+        return;
+      }
+      const hijo = {
+        id: ctx.generateRecordId(tipo, rec.fecha),
+        tipo,
+        empresa_id: rec.empresa_id,
+        cliente_operacion: rec.cliente_operacion,
+        instalacion: rec.instalacion,
+        fecha: rec.fecha,
+        area: '',
+        titulo: texto.split('\n')[0].slice(0, 120),
+        descripcion: `${texto}\n\n${origen}`,
+        reportado_por: rec.elaborado_por || '',
+        reportado_nombre: rec.elaborado_por || '',
+        reportado_cargo: '',
+        clasificacion_origen: '',
+        severidad: '',
+        estado: 'Abierto',
+        comunicar_a: '', medio_comunicacion: '', plazo_comunicacion: '',
+        responsable: '', fecha_vencimiento: '', fecha_cierre: '',
+        referencia_normativa: `Generada automáticamente desde ${def.label} ${codigo}`,
+        acciones_correctivas: [], acciones_preventivas: [],
+        adjuntos: [], lecciones_aprendidas: [],
+        origen_automatico: true,
+        origen_registro_id: rec.id,
+        origen_registro_tipo: rec.tipo,
+      };
+      DATA.records.push(hijo);
+      it.rec_id = hijo.id;
+      it.sync_texto = texto;
+      aGuardar.push(hijo);
+    });
+  });
+  return aGuardar;
 }
 
 async function saveInforme(){
@@ -656,12 +750,21 @@ async function saveInforme(){
 
   const idx = DATA.records.findIndex(x => x.id === rec.id);
   if(idx >= 0) DATA.records[idx] = rec; else DATA.records.push(rec);
+
+  // Evaluación → registros de seguimiento (OM / LA / RP)
+  const hijos = sincronizarEvaluacion(rec);
+  let creados = 0;
+  if(hijos.length){
+    for(const h of hijos){ if(await ctx.upsertRegistro(h)) creados++; }
+    await ctx.upsertRegistro(rec); // guarda los vínculos (rec_id) en el informe
+  }
+
   F = JSON.parse(JSON.stringify(rec));
   F_ORIGINAL = JSON.stringify(F);
   FOTOS_ORIGINALES = fotoPaths(rec);
   closeInformeForm(true);
   ctx.renderAll();
-  ctx.showToast(`Informe ${ctx.codigoMostrado(rec)} guardado`);
+  ctx.showToast(`Informe ${ctx.codigoMostrado(rec)} guardado${creados ? ` · ${creados} registro(s) de seguimiento creados/actualizados` : ''}`);
 }
 
 async function deleteInforme(id){
@@ -669,7 +772,8 @@ async function deleteInforme(id){
   const DATA = ctx.getData();
   const r = DATA.records.find(x => x.id === id);
   if(!r) return;
-  if(!confirm(`¿Eliminar el informe ${ctx.codigoMostrado(r)} y sus fotos? Esta acción no se puede deshacer.`)) return;
+  const nHijos = DATA.records.filter(x => x.origen_registro_id === id).length;
+  if(!confirm(`¿Eliminar el informe ${ctx.codigoMostrado(r)} y sus fotos? Esta acción no se puede deshacer.${nHijos ? `\n\nLos ${nHijos} registro(s) de seguimiento que generó (OM / LA / RP) NO se eliminan.` : ''}`)) return;
   const ok = await ctx.deleteRegistroRow(id);
   if(!ok) return;
   const paths = fotoPaths(r);
@@ -849,6 +953,8 @@ function ensureStyles(){
     .inf-actions button{border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:12px;padding:0;}
     .inf-actions button:disabled{opacity:0.3;cursor:default;}
     .inf-actions button.del{color:var(--red);}
+    .inf-gen{font-size:10.5px;color:var(--graphite);padding-left:2px;}
+    .inf-gen.ok{color:#1E7A4A;font-weight:600;}
     .inf-fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:8px;}
     .inf-foto{border:1px solid var(--line);border-radius:6px;padding:8px;background:#fff;display:flex;flex-direction:column;gap:6px;}
     .inf-thumb{position:relative;height:150px;background:var(--paper-dark);border-radius:4px;overflow:hidden;}
