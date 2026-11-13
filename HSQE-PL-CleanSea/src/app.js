@@ -2,6 +2,7 @@ import Chart from 'chart.js/auto';
 import { supabase } from './lib/supabase.js';
 import html2canvas from 'html2canvas';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { INFORME_TIPOS, INFORME_DEF, esInforme, setupInformes, renderInformesPanel } from './informes.js';
 
 
 /* ============ CONFIG ============ */
@@ -22,7 +23,13 @@ const TYPES = {
   INSP:{label:'Inspección',          color:'#2F8F83'},
   TISO:{label:'Tareas ISO/ISM',      color:'#146C5E'},
   PROG:{label:'Programado',          color:'#4A5FBF'},
+  // Informes (F5-001 / F5-002 / F5-004): se gestionan en su propia sección (ver informes.js).
+  IDER:{label:'Informe de Derrame',    color:'#0E5A8A'},
+  ISIM:{label:'Informe de Simulacro',  color:'#1E7A4A'},
+  ISAL:{label:'Informe de Salvamento', color:'#B5452B'},
 };
+// Tipos que NO se mezclan en "Todos los registros" (tienen su propia sección).
+function fueraDeTodos(tipo){ return tipo==='TISO' || tipo==='PROG' || esInforme(tipo); }
 // Frase para personalizar etiquetas por tipo: "Fecha del incidente", "Título de la sugerencia de mejora", etc.
 const TIPO_DESCRIPTOR = {
   NC:  'de la no conformidad',
@@ -518,6 +525,17 @@ function generateRecordId(tipo, fechaStr){
 // El id interno del registro no cambia; esto solo afecta lo que se ve en tabla y PDF.
 function codigoMostrado(r){
   if(!r) return '';
+  if(esInforme(r.tipo)){
+    // Informes: código del formulario + correlativo por año (ej: F5-002 · N° 003/2026)
+    const def = INFORME_DEF[r.tipo];
+    const year = (r.fecha||'').slice(0,4);
+    const mismos = DATA.records
+      .filter(x => x.tipo === r.tipo && (x.fecha||'').slice(0,4) === year)
+      .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.creado_en||a.id||'').localeCompare(b.creado_en||b.id||''));
+    const pos = mismos.findIndex(x => x.id === r.id);
+    const num = String((pos < 0 ? mismos.length : pos) + 1).padStart(3,'0');
+    return `${def.codigo} · N° ${num}/${year || '—'}`;
+  }
   if(!r.fecha) return r.id;
   const year = new Date(r.fecha+'T00:00:00').getFullYear();
   const mismos = DATA.records
@@ -650,7 +668,9 @@ function renderTypeNav(){
   const label = (t, mt) => `<div class="nav-label" style="margin-top:${mt||0}px;">${t}</div>`;
   let html = label('Categorías');
   // Tareas ISO/ISM no se mezcla en el total de "Todos los registros" (queda solo en su sección).
-  html += navItem('ALL', 'Todos los registros', navDotColor('ALL'), filtered.filter(r=>r.tipo!=='TISO' && r.tipo!=='PROG').length);
+  html += navItem('ALL', 'Todos los registros', navDotColor('ALL'), filtered.filter(r=>!fueraDeTodos(r.tipo)).length);
+  // INFORMES (F5-001 Derrame / F5-002 Simulacro / F5-004 Salvamento) — antes de Auditorías / Inspecciones
+  html += label('Informes', 12) + INFORME_TIPOS.map(k => navItem(k, `${INFORME_DEF[k].codigo} ${INFORME_DEF[k].corto}`, INFORME_DEF[k].color, count(k))).join('');
   html += label('Auditorías / Inspecciones', 12) + group(NAV_GROUP_AUDITORIAS);
   html += label('Hallazgos', 12) + group(NAV_GROUP_HALLAZGOS);
   html += label('Reporte de Eventos', 12) + group(NAV_GROUP_EVENTOS);
@@ -716,7 +736,7 @@ function filteredRecords(bySiteOnly){
   let r = DATA.records.filter(x => currentSiteFilter==='ALL' || x.instalacion===currentSiteFilter);
   if(currentClienteFilter!=='ALL') r = r.filter(x => (x.cliente_operacion||'') === currentClienteFilter);
   if(!bySiteOnly){
-    if(currentTypeFilter==='ALL') r = r.filter(x=>x.tipo!=='TISO' && x.tipo!=='PROG'); // Tareas ISO/ISM y Programados solo se ven en su propia sección
+    if(currentTypeFilter==='ALL') r = r.filter(x=>!fueraDeTodos(x.tipo)); // Tareas ISO/ISM, Programados e Informes solo se ven en su propia sección
     else r = r.filter(x=>x.tipo===currentTypeFilter);
   }
   return r;
@@ -1461,6 +1481,7 @@ function renderTopbar(){
 }
 function topbarSearch(v){
   currentSearch = (v||'').toLowerCase();
+  if(esInforme(currentTypeFilter) || ['KPI','ACCIONES','PROGRAMADOS'].includes(currentTypeFilter)) return; // vistas con su propio contenido
   renderTable();
 }
 
@@ -1609,7 +1630,13 @@ function renderProgramadosPanel(){
 function setKpiViewMode(kpiMode){
   const accMode = currentTypeFilter === 'ACCIONES';
   const progMode = currentTypeFilter === 'PROGRAMADOS';
-  const especial = kpiMode || accMode || progMode;
+  const infMode = esInforme(currentTypeFilter);
+  const especial = kpiMode || accMode || progMode || infMode;
+  const infp = document.getElementById('informesPanel');
+  if(infp) infp.style.display = infMode ? 'block' : 'none';
+  // En Informes se oculta también la barra de "Imprimir gráficos"
+  const chartsHdr = document.getElementById('chartsSectionLabel');
+  if(chartsHdr && chartsHdr.parentElement) chartsHdr.parentElement.style.display = infMode ? 'none' : 'flex';
   const toggles = [
     document.getElementById('kpiRow'),
     document.querySelector('.chart-row'),
@@ -1668,7 +1695,9 @@ function renderAll(){
   const progMode = currentTypeFilter === 'PROGRAMADOS';
   setKpiViewMode(kpiMode);
 
-  if(accMode){
+  if(esInforme(currentTypeFilter)){
+    renderInformesPanel(currentTypeFilter);
+  } else if(accMode){
     document.getElementById('viewTitle').textContent = 'Plan de acciones';
     document.getElementById('viewMeta').textContent = 'Acciones correctivas y preventivas de todos los registros (solo consulta)';
     renderAccionesPanel();
@@ -1698,6 +1727,12 @@ function renderAll(){
 
 /* ============ FORM / MODAL ============ */
 function openRecordForm(id, forceTipo){
+  // Los informes tienen su propio formulario
+  const recInf = id ? DATA.records.find(x=>x.id===id) : null;
+  if((recInf && esInforme(recInf.tipo)) || (!id && esInforme(forceTipo || currentTypeFilter))){
+    window.openInformeForm(id || null, recInf ? recInf.tipo : (forceTipo || currentTypeFilter));
+    return;
+  }
   editingId = id || null;
   const r = id ? DATA.records.find(x=>x.id===id) : null;
   const co = r ? r.empresa_id : (DATA.companies[0]?.id || '');
@@ -1726,7 +1761,7 @@ function openRecordForm(id, forceTipo){
         <div class="section-title">Clasificación</div>
         <div class="field-row">
           <div class="field"><label>Tipo de evento</label>
-            <select id="f_tipo">${Object.keys(TYPES).filter(k=>(k!=='PROG' || tipo==='PROG') && (k!=='TISO' || usuarioActualPuedeVisar())).map(k=>`<option value="${k}" ${k===tipo?'selected':''}>${TYPES[k].label}</option>`).join('')}</select>
+            <select id="f_tipo">${Object.keys(TYPES).filter(k=>!esInforme(k) && (k!=='PROG' || tipo==='PROG') && (k!=='TISO' || usuarioActualPuedeVisar())).map(k=>`<option value="${k}" ${k===tipo?'selected':''}>${TYPES[k].label}</option>`).join('')}</select>
           </div>
           <div class="field"><label>Cliente / Operación</label>
             <select id="f_cliente">${clienteOptionsHtml(r ? r.cliente_operacion : 'No Asignado a Cliente')}</select>
@@ -3810,7 +3845,7 @@ function printCompanyReport(){
     </table>`;
 
   sitiosAImprimir.forEach(sitio => {
-    const recs = DATA.records.filter(r => r.instalacion === sitio);
+    const recs = DATA.records.filter(r => r.instalacion === sitio && !esInforme(r.tipo));
     const abiertas = recs.filter(r => !esCerrado(r.estado));
     const vencidas = recs.filter(isOverdue);
     const cerradas = recs.filter(r => esCerrado(r.estado));
@@ -4323,6 +4358,8 @@ function escapeHtml(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 async function previewRecordPDF(id){
+  const recInf = DATA.records.find(x=>x.id===id);
+  if(recInf && esInforme(recInf.tipo)){ window.previewInforme(id); return; }
   const win = window.open('', '_blank');
   if(win){
     win.document.write('<title>Generando PDF…</title><body style="font-family:Arial,sans-serif;color:#5B6671;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">Generando la vista previa del PDF…</body>');
@@ -4376,5 +4413,14 @@ export function initApp(session){
   if(emailEl && session && session.user) emailEl.textContent = session.user.email;
   document.querySelector('.app').style.display = 'flex';
   fixSidebarLayout();
+  setupInformes({
+    supabase,
+    getData: () => DATA,
+    getSiteFilter: () => currentSiteFilter,
+    getUser: () => CURRENT_USER,
+    upsertRegistro, deleteRegistroRow, showToast, uid, todayISO, codigoMostrado, esCerrado,
+    clientesDisponibles, getCompanyLogo, logoToDataURL, renderAll,
+    puedeVisar: usuarioActualPuedeVisar,
+  });
   loadData();
 }
