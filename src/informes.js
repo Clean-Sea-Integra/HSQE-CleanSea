@@ -116,6 +116,7 @@ export function setupInformes(context){
     openInformeForm, closeInformeForm, infSet, infSetItem, infAddItem, infRemoveItem, infMoveItem,
     infUploadFotos, infUploadFotoUbicacion, infRemoveFotoUbicacion, infSetFotoEpigrafe, infRemoveFoto, infMoveFoto,
     saveInforme, deleteInforme, previewInforme, infPanelSearch, infPanelYear, infChangeTipo, infSetGenera,
+    infGeoAplicar, infGeoMiUbicacion, infGeoDesdeCampos, infGeoVista, infGeoQuitar,
   });
 }
 
@@ -232,6 +233,11 @@ function openInformeForm(id, tipo){
     if(!Array.isArray(F.fotos)) F.fotos = [];
   } else {
     F = nuevoInforme(esInforme(tipo) ? tipo : 'ISIM');
+  }
+  // Informes con Latitud/Longitud cargadas a mano y sin mapa: se ubica el punto automáticamente.
+  if(!F.geo){
+    const lat = parseCoordUnica(F.latitud), lng = parseCoordUnica(F.longitud);
+    if(geoValido(lat, lng)) F.geo = { lat: +lat.toFixed(7), lng: +lng.toFixed(7) };
   }
   F_ORIGINAL = JSON.stringify(F);
   FOTOS_ORIGINALES = fotoPaths(F);
@@ -364,9 +370,18 @@ function renderForm(){
 
       ${sec(1, 'Posición geográfica')}
       ${txt('terminal', 'Terminal portuaria / lugar', 'Ej: YPF – Muelle Terminal de Descargas, Km 7, margen derecha del riacho Barranqueras, Chaco, Argentina.', { textarea: true, h: 50 })}
+      <div class="field"><label>Ubicación en Google Maps</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="infGeoInput" style="flex:1;min-width:240px;" placeholder="Pegá coordenadas o un link de Google Maps, o escribí un lugar (ej: Terminal YPF Barranqueras)" onkeydown="if(event.key==='Enter'){event.preventDefault();infGeoAplicar();}">
+          <button class="btn secondary" style="padding:6px 12px;font-size:12px;" onclick="infGeoAplicar()">🔎 Ubicar</button>
+          <button class="btn secondary" style="padding:6px 12px;font-size:12px;" onclick="infGeoMiUbicacion()" title="Usa el GPS del dispositivo (ideal desde el celular, en el lugar)">📍 Mi ubicación actual</button>
+        </div>
+        <div style="font-size:11px;color:var(--graphite-light);margin-top:4px;">Para el punto exacto: en Google Maps hacé <b>clic derecho</b> sobre el lugar (en el celular, mantené apretado), copiá las coordenadas y pegalas acá. Latitud y Longitud se completan solas.</div>
+        <div id="infGeoMapa" style="margin-top:8px;"></div>
+      </div>
       <div class="field-row">
-        ${txt('latitud', 'Latitud', `Ej: 27°30'09.95" S`)}
-        ${txt('longitud', 'Longitud', `Ej: 58°55'50.46" O`)}
+        <div class="field"><label>Latitud</label><input type="text" id="infLat" value="${esc(F.latitud || '')}" oninput="infSet('latitud',this.value);infGeoDesdeCampos()" placeholder="Ej: 27°30'09.95&quot; S"></div>
+        <div class="field"><label>Longitud</label><input type="text" id="infLng" value="${esc(F.longitud || '')}" oninput="infSet('longitud',this.value);infGeoDesdeCampos()" placeholder="Ej: 58°55'50.46&quot; O"></div>
       </div>
       <div class="field"><label>Imagen de ubicación (mapa / satelital)</label><div id="infFotoUbic"></div></div>
       ${sub('a) Fecha y horario')}
@@ -438,6 +453,140 @@ function renderForm(){
   ensureStyles();
   renderFotoUbicacion();
   renderFotos();
+  renderGeoMapa();
+}
+
+/* ============ UBICACIÓN — GOOGLE MAPS ============
+   Se guarda en F.geo = { lat, lng } (punto exacto) o { query } (lugar buscado por nombre).
+   Vista previa con el mapa embebido de Google Maps (no requiere clave de API). */
+function num(s){ return parseFloat(String(s).replace(',', '.')); }
+function geoValido(lat, lng){ return isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0); }
+
+// Un valor suelto: decimal (-27.5027) o grados/minutos/segundos (27°30'09.95" S).
+function parseCoordUnica(txt){
+  const s = String(txt || '').trim().toUpperCase().replace(/,/g, '.');
+  if(!s) return NaN;
+  if(/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  const hem = (s.match(/[NSEWO]/) || [''])[0];
+  const nums = (s.match(/\d+(\.\d+)?/g) || []).map(parseFloat);
+  if(!nums.length) return NaN;
+  const v = nums[0] + (nums[1] || 0) / 60 + (nums[2] || 0) / 3600;
+  return (s.startsWith('-') || hem === 'S' || hem === 'W' || hem === 'O') ? -v : v;
+}
+
+// Texto libre: link de Google Maps, par decimal o par en grados/minutos/segundos.
+function parseGeoTexto(txt){
+  const s = String(txt || '').trim();
+  if(!s) return null;
+  const pares = [
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,                                   // link de un lugar marcado
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,                                       // link con el mapa centrado
+    /[?&](?:q|query|ll|center|destination)=(-?\d+\.\d+)(?:,|%2C)\s*\+?(-?\d+\.\d+)/i,
+    /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/,   // "-27.5027, -58.9307"
+  ];
+  for(const re of pares){
+    const m = s.match(re);
+    if(m){ const lat = num(m[1]), lng = num(m[2]); if(geoValido(lat, lng)) return { lat, lng }; }
+  }
+  // Grados/minutos/segundos: 27°30'09.95"S 58°55'50.46"W
+  const dms = s.toUpperCase().match(/(\d+[°º]\s*\d+['’′]?\s*[\d.,]*["”″']*\s*[NS])[\s,;]*(\d+[°º]\s*\d+['’′]?\s*[\d.,]*["”″']*\s*[EWO])/);
+  if(dms){ const lat = parseCoordUnica(dms[1]), lng = parseCoordUnica(dms[2]); if(geoValido(lat, lng)) return { lat, lng }; }
+  return null;
+}
+
+function aDMS(v, esLat){
+  const hem = esLat ? (v < 0 ? 'S' : 'N') : (v < 0 ? 'O' : 'E');
+  let a = Math.abs(v);
+  let g = Math.floor(a); a = (a - g) * 60;
+  let m = Math.floor(a); let sec = +((a - m) * 60).toFixed(2);
+  if(sec >= 60){ sec = 0; m++; } if(m >= 60){ m = 0; g++; }
+  return `${g}°${String(m).padStart(2, '0')}'${sec.toFixed(2).padStart(5, '0')}" ${hem}`;
+}
+
+export function googleMapsLink(geo){
+  if(!geo) return '';
+  if(geoValido(geo.lat, geo.lng)) return `https://www.google.com/maps/search/?api=1&query=${geo.lat},${geo.lng}`;
+  if(geo.query) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(geo.query)}`;
+  return '';
+}
+function googleMapsEmbed(geo, satelital){
+  const q = geoValido(geo.lat, geo.lng) ? `${geo.lat},${geo.lng}` : encodeURIComponent(geo.query || '');
+  return `https://maps.google.com/maps?q=${q}&t=${satelital ? 'k' : 'm'}&z=${geoValido(geo.lat, geo.lng) ? 16 : 14}&hl=es&output=embed`;
+}
+
+let geoSatelital = true;
+function renderGeoMapa(){
+  const el = document.getElementById('infGeoMapa');
+  if(!el || !F) return;
+  const g = F.geo;
+  if(!g || (!geoValido(g.lat, g.lng) && !g.query)){ el.innerHTML = ''; return; }
+  const exacto = geoValido(g.lat, g.lng);
+  el.innerHTML = `
+    <div style="border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;">
+      <iframe src="${googleMapsEmbed(g, geoSatelital)}" style="width:100%;height:300px;border:0;display:block;" referrerpolicy="no-referrer-when-downgrade" title="Mapa de ubicación"></iframe>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 10px;font-size:12px;border-top:1px solid var(--line);">
+        <span style="color:${exacto ? '#1E7A4A' : '#B07D0A'};font-weight:600;">${exacto ? `✔ Punto exacto: ${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}` : `Lugar buscado: “${esc(g.query)}” (sin coordenadas exactas)`}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;">
+          <button class="btn secondary" style="padding:3px 10px;font-size:11px;" onclick="infGeoVista()">${geoSatelital ? '🗺 Ver mapa' : '🛰 Ver satélite'}</button>
+          <a class="btn secondary" style="padding:3px 10px;font-size:11px;text-decoration:none;" href="${googleMapsLink(g)}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a>
+          <button class="btn secondary" style="padding:3px 10px;font-size:11px;color:var(--red);" onclick="infGeoQuitar()">Quitar</button>
+        </span>
+      </div>
+    </div>`;
+}
+function setGeo(lat, lng){
+  F.geo = { lat: +lat.toFixed(7), lng: +lng.toFixed(7) };
+  F.latitud = aDMS(lat, true);
+  F.longitud = aDMS(lng, false);
+  const la = document.getElementById('infLat'), lo = document.getElementById('infLng');
+  if(la) la.value = F.latitud;
+  if(lo) lo.value = F.longitud;
+  renderGeoMapa();
+}
+function infGeoAplicar(){
+  const inp = document.getElementById('infGeoInput');
+  const txt = (inp && inp.value || '').trim();
+  if(!txt) return;
+  const p = parseGeoTexto(txt);
+  if(p){ setGeo(p.lat, p.lng); inp.value = ''; ctx.showToast('Ubicación cargada'); return; }
+  if(/^https?:\/\//i.test(txt)){
+    ctx.showToast('Ese link no trae coordenadas (los links cortos maps.app.goo.gl no se pueden leer). Copiá las coordenadas con clic derecho en Google Maps.');
+    return;
+  }
+  // Búsqueda por nombre: muestra el lugar en el mapa (sin coordenadas exactas).
+  // Se borran Latitud/Longitud anteriores para que no contradigan el lugar nuevo.
+  F.geo = { query: txt };
+  F.latitud = ''; F.longitud = '';
+  const la = document.getElementById('infLat'), lo = document.getElementById('infLng');
+  if(la) la.value = ''; if(lo) lo.value = '';
+  inp.value = '';
+  renderGeoMapa();
+  ctx.showToast('Lugar ubicado. Para el punto exacto pegá las coordenadas desde Google Maps.');
+}
+function infGeoMiUbicacion(){
+  if(!navigator.geolocation){ ctx.showToast('Este dispositivo no permite obtener la ubicación'); return; }
+  ctx.showToast('Obteniendo ubicación…');
+  navigator.geolocation.getCurrentPosition(
+    pos => { setGeo(pos.coords.latitude, pos.coords.longitude); ctx.showToast(`Ubicación cargada (precisión ± ${Math.round(pos.coords.accuracy)} m)`); },
+    err => ctx.showToast(err && err.code === 1 ? 'Permiso de ubicación denegado. Habilitalo en el navegador.' : 'No se pudo obtener la ubicación'),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+let geoTimer = null;
+function infGeoDesdeCampos(){
+  clearTimeout(geoTimer);
+  geoTimer = setTimeout(() => {
+    const lat = parseCoordUnica(F.latitud), lng = parseCoordUnica(F.longitud);
+    if(geoValido(lat, lng)){ F.geo = { lat: +lat.toFixed(7), lng: +lng.toFixed(7) }; renderGeoMapa(); }
+  }, 600);
+}
+function infGeoVista(){ geoSatelital = !geoSatelital; renderGeoMapa(); }
+function infGeoQuitar(){
+  if(!confirm('¿Quitar la ubicación del mapa? (Latitud y Longitud también se borran)')) return;
+  F.geo = null; F.latitud = ''; F.longitud = '';
+  const la = document.getElementById('infLat'), lo = document.getElementById('infLng');
+  if(la) la.value = ''; if(lo) lo.value = '';
+  renderGeoMapa();
 }
 
 function closeInformeForm(silent){
@@ -900,6 +1049,7 @@ async function previewInforme(id){
   ${has(r.terminal) ? `<p><b>Terminal portuaria:</b> ${nl2br(r.terminal)}</p>` : ''}
   ${has(r.latitud) ? `<p><b>Latitud:</b> ${esc(r.latitud)}</p>` : ''}
   ${has(r.longitud) ? `<p><b>Longitud:</b> ${esc(r.longitud)}</p>` : ''}
+  ${(() => { const g = r.geo || (geoValido(parseCoordUnica(r.latitud), parseCoordUnica(r.longitud)) ? { lat: parseCoordUnica(r.latitud), lng: parseCoordUnica(r.longitud) } : null); const url = googleMapsLink(g); return url ? `<p><b>Google Maps:</b> <a href="${url}" target="_blank" rel="noopener">${geoValido(g.lat, g.lng) ? `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}` : esc(g.query)}</a></p>` : ''; })()}
   ${figura(urlU, 1, fotoU && fotoU.epigrafe)}
   <h3>a) Fecha y horario</h3>
   ${horario.map(x => `<p>${x}</p>`).join('')}
