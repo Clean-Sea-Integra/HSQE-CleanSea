@@ -640,10 +640,11 @@ function setClienteFilter(v){ currentClienteFilter = v; renderAll(); }
 function setSiteFilter(v){ currentSiteFilter = v; renderAll(); }
 
 // Orden y agrupación del menú lateral de categorías
-const NAV_GROUP_HALLAZGOS = ['NC','OBS','OM'];
-const NAV_GROUP_EVENTOS = ['INC','ACC','CUA','LA'];
+// Lección Aprendida y Reporte Positivo se agrupan en Hallazgos (antes estaban en Eventos / Proactivos).
+const NAV_GROUP_HALLAZGOS = ['NC','OBS','OM','LA','RP'];
+const NAV_GROUP_EVENTOS = ['INC','ACC','CUA'];
 // Sugerencia de Mejora (SUG) se quitó del menú y de los registros nuevos (los existentes siguen editables).
-const NAV_ORDER_PROACTIVOS = ['AI','CI','RP'];
+const NAV_ORDER_PROACTIVOS = ['AI','CI'];
 const NAV_GROUP_CAPACITACION = ['CAP'];
 const NAV_GROUP_AUDITORIAS = ['AUD','INSP'];
 const NAV_GROUP_TAREAS_ISO = ['TISO'];
@@ -655,8 +656,9 @@ const NAV_DOT_COLORS = {
   ALL:'#1C3666',
   AUD:'#3E6B8C', INSP:'#2F8F83',                       // auditorías / inspecciones
   NC:'#E67E22', OBS:'#E67E22', OM:'#E67E22',            // naranja
-  INC:'#C0392B', ACC:'#C0392B', CUA:'#C0392B', LA:'#C0392B', // rojo
-  AI:'#8FC1E8', CI:'#8FC1E8', SUG:'#8FC1E8', RP:'#8FC1E8', // celeste claro
+  LA:'#E67E22', RP:'#E67E22',                           // naranja (Hallazgos)
+  INC:'#C0392B', ACC:'#C0392B', CUA:'#C0392B',           // rojo
+  AI:'#8FC1E8', CI:'#8FC1E8', SUG:'#8FC1E8',             // celeste claro
   CAP:'#B39DDB',                                        // violeta claro
 };
 function navDotColor(k){ return NAV_DOT_COLORS[k] || (TYPES[k] && TYPES[k].color) || '#B7C4CE'; }
