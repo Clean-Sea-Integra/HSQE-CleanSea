@@ -45,14 +45,14 @@
       <div class="sub">Módulo HSQE</div>
     </div>
     <div class="company-select" style="padding-top:12px;">
-      <label style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:5px;padding-left:2px;">Sitio / Buque</label>
+      <label style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:5px;padding-left:2px;">Base / Departamento</label>
       <select id="siteFilter" onchange="setSiteFilter(this.value)"></select>
     </div>
     <div class="nav-section" id="typeNav"></div>
     <div class="nav-section" id="navConfigSection" style="margin-top:auto;">
       <div class="nav-label">Configuración</div>
       <div class="nav-item" onclick="openCatalogManager()">⚙ Gestionar catálogos</div>
-      <div class="nav-item" id="printReportBtn" onclick="printCompanyReport()">🖨 Reporte PDF por sitio</div>
+      <div class="nav-item" id="printReportBtn" onclick="printCompanyReport()">🖨 Reporte PDF por base / departamento</div>
       <div class="nav-item" onclick="exportData()">⬇ Exportar datos (JSON)</div>
       <div class="nav-item" onclick="refreshData()">↻ Actualizar datos</div>
     </div>
