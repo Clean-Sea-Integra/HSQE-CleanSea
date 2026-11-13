@@ -35,7 +35,7 @@ const DEFAULTS = {
   seguridad_embarcaciones: 'Las embarcaciones dispuestas se encuentran habilitadas por la Autoridad Marítima para desarrollar sus respectivas tareas. Cada una cuenta con los elementos y el armamento obligatorios, en cumplimiento de la normativa vigente.',
   seguridad_personal: 'El personal cuenta con los elementos de protección personal requeridos para la tarea que desempeña.',
   seguridad_capacitacion: 'El personal se encuentra capacitado en técnicas de control de derrames y cuenta con los cursos de seguridad correspondientes y con los exigidos por las empresas contratantes.',
-  mejoras_intro: 'Según la evaluación realizada, se identificaron las siguientes oportunidades de mejora:',
+  evaluacion_intro: 'Como resultado de la evaluación de la actuación se identificaron los siguientes puntos:',
 };
 
 // Listas editables: cada una define sus columnas.
@@ -50,18 +50,34 @@ const LISTAS = {
   invitados:           { add: '+ Agregar invitado',  cols: [{ k: 'nombre', ph: 'Nombre y apellido' }, { k: 'funcion', ph: 'Función' }, { k: 'institucion', ph: 'Institución', list: 'infInstitucionesDL' }] },
   seguridad_lugar:     { add: '+ Agregar condición', cols: [{ k: 'texto', ph: 'Condición del lugar' }] },
   resultados:          { add: '+ Agregar resultado', cols: [{ k: 'texto', ph: 'Resultado', type: 'textarea' }] },
-  fortalezas:          { add: '+ Agregar fortaleza', cols: [{ k: 'texto', ph: 'Fortaleza observada', type: 'textarea' }, { k: 'genera', type: 'genera', w: '200px' }] },
-  mejoras:             { add: '+ Agregar oportunidad', cols: [{ k: 'texto', ph: 'Oportunidad de mejora', type: 'textarea' }, { k: 'genera', type: 'genera', w: '200px' }] },
+  evaluacion:          { add: '+ Agregar punto de evaluación', cols: [{ k: 'genera', type: 'genera', w: '230px' }, { k: 'texto', ph: 'Describí el punto observado', type: 'textarea' }] },
 };
 
 // Evaluación (11): cada ítem puede quedar solo como texto del informe o generar un registro
 // para su seguimiento en la sección correspondiente del ERP.
 const GENERA_OPCIONES = [
-  { v: '',   l: 'Solo texto del informe' },
+  { v: '',   l: 'Comentario (solo en el informe)' },
+  { v: 'RP', l: 'Reporte Positivo' },
   { v: 'OM', l: 'Oportunidad de Mejora' },
   { v: 'LA', l: 'Lección Aprendida' },
-  { v: 'RP', l: 'Reporte Positivo' },
 ];
+// Agrupación en el informe impreso, según el tipo elegido en cada punto.
+const EVAL_GRUPOS = [
+  { v: 'RP', titulo: 'Aspectos positivos' },
+  { v: 'OM', titulo: 'Oportunidades de mejora' },
+  { v: 'LA', titulo: 'Lecciones aprendidas' },
+  { v: '',   titulo: 'Otras observaciones' },
+];
+// Informes cargados con el formato anterior (11.1 Fortalezas / 11.2 Oportunidades de mejora):
+// se pasan a la lista única de evaluación. Las fortalezas "solo texto" pasan como Comentario.
+function migrarEvaluacion(r){
+  if(Array.isArray(r.evaluacion)) return r;
+  const viejos = [...(r.fortalezas || []), ...(r.mejoras || [])];
+  r.evaluacion = viejos.map(it => ({ genera: it.genera || '', texto: it.texto || '', ...(it.rec_id ? { rec_id: it.rec_id, sync_texto: it.sync_texto || '' } : {}) }));
+  if(r.evaluacion_intro == null) r.evaluacion_intro = r.mejoras_intro || '';
+  delete r.fortalezas; delete r.mejoras; delete r.mejoras_intro;
+  return r;
+}
 const GENERA_LABEL = { OM: 'Oportunidad de Mejora', LA: 'Lección Aprendida', RP: 'Reporte Positivo' };
 
 let ctx = null;         // funciones/estado compartidos que provee app.js
@@ -201,8 +217,7 @@ function nuevoInforme(tipo){
     seguridad_personal: DEFAULTS.seguridad_personal,
     seguridad_capacitacion: DEFAULTS.seguridad_capacitacion,
     resultados: [nuevoItem('resultados')],
-    fortalezas: [nuevoItem('fortalezas')],
-    mejoras_intro: DEFAULTS.mejoras_intro, mejoras: [nuevoItem('mejoras')],
+    evaluacion_intro: DEFAULTS.evaluacion_intro, evaluacion: [nuevoItem('evaluacion')],
     conclusion: '',
   };
 }
@@ -212,7 +227,7 @@ function openInformeForm(id, tipo){
   if(id){
     const r = DATA.records.find(x => x.id === id);
     if(!r){ ctx.showToast('No se encontró el informe'); return; }
-    F = JSON.parse(JSON.stringify(r));
+    F = migrarEvaluacion(JSON.parse(JSON.stringify(r)));
     Object.keys(LISTAS).forEach(k => { if(!Array.isArray(F[k])) F[k] = []; });
     if(!Array.isArray(F.fotos)) F.fotos = [];
   } else {
@@ -281,7 +296,7 @@ function renderListaHtml(key){
 function listaHtml(key){ return `<div id="infWrap_${key}">${renderListaHtml(key)}</div>`; }
 function colLabel(key, c){
   const L = { titulo: 'Título', descripcion: 'Descripción', hora: 'Hora', item: 'Ítem', caracteristicas: 'Características', cantidad: 'Cantidad',
-    um: 'UM', genera: 'Registrar como', cargo: 'Cargo', nombre: 'Nombre', inicio: 'Inicio', fin: 'Final', funcion: 'Función', institucion: 'Institución', texto: '' };
+    um: 'UM', genera: 'Tipo', cargo: 'Cargo', nombre: 'Nombre', inicio: 'Inicio', fin: 'Final', funcion: 'Función', institucion: 'Institución', texto: '' };
   return L[c.k] != null ? L[c.k] : c.k;
 }
 function rerenderLista(key){
@@ -401,11 +416,9 @@ function renderForm(){
       ${listaHtml('resultados')}
 
       ${sec(11, 'Evaluación de la actuación')}
-      ${sub('11.1 Fortalezas observadas')}
-      ${listaHtml('fortalezas')}
-      ${sub('11.2 Oportunidades de mejora')}
-      ${txt('mejoras_intro', 'Introducción', '')}
-      ${listaHtml('mejoras')}
+      <div style="font-size:12px;color:var(--graphite);margin-bottom:8px;">Cargá cada punto y elegí su tipo. <b>Reporte Positivo</b>, <b>Oportunidad de Mejora</b> y <b>Lección Aprendida</b> crean además un registro en su sección para el seguimiento. En el informe impreso los puntos se agrupan por tipo.</div>
+      ${txt('evaluacion_intro', 'Introducción (opcional)', '')}
+      ${listaHtml('evaluacion')}
 
       ${sec(12, 'Conclusión')}
       ${txt('conclusion', 'Conclusión', '', { textarea: true, h: 160 })}
@@ -663,7 +676,7 @@ function sincronizarEvaluacion(rec){
   const def = INFORME_DEF[rec.tipo];
   const codigo = ctx.codigoMostrado(rec);
   const aGuardar = [];
-  ['fortalezas', 'mejoras'].forEach(key => {
+  ['evaluacion'].forEach(key => {
     (rec[key] || []).forEach(it => {
       const tipo = it.genera;
       const texto = (it.texto || '').trim();
@@ -790,8 +803,9 @@ async function previewInforme(id){
   if(!win){ ctx.showToast('El navegador bloqueó la ventana. Habilitá los pop-ups para este sitio.'); return; }
   win.document.write('<title>Generando informe…</title><body style="font-family:Arial,sans-serif;color:#5B6671;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">Generando informe…</body>');
   const DATA = ctx.getData();
-  const r = DATA.records.find(x => x.id === id);
-  if(!r){ win.close(); ctx.showToast('No se encontró el informe'); return; }
+  const encontrado = DATA.records.find(x => x.id === id);
+  if(!encontrado){ win.close(); ctx.showToast('No se encontró el informe'); return; }
+  const r = migrarEvaluacion(JSON.parse(JSON.stringify(encontrado)));
   const def = INFORME_DEF[r.tipo];
   const codigo = ctx.codigoMostrado(r);
   const logo = await ctx.logoToDataURL(ctx.getCompanyLogo(r.empresa_id));
@@ -822,6 +836,15 @@ async function previewInforme(id){
   const offset = fotoU ? 2 : 1;
 
   const cron = (r.cronologia || []).filter(c => has(c.hora) || has(c.titulo) || has(c.descripcion));
+
+  // 11) Evaluación: agrupada según el tipo elegido en cada punto (solo grupos con contenido).
+  const evalItems = (r.evaluacion || []).filter(it => has(it.texto));
+  const gruposConItems = EVAL_GRUPOS.map(g => ({ ...g, items: evalItems.filter(it => (it.genera || '') === g.v) })).filter(g => g.items.length);
+  const soloComentarios = gruposConItems.length === 1 && gruposConItems[0].v === '';
+  const evalHtml = !evalItems.length ? '<p class="muted">—</p>'
+    : p(r.evaluacion_intro) + (soloComentarios
+      ? lista(evalItems)
+      : gruposConItems.map(g => `<h3>${esc(g.titulo)}</h3>${lista(g.items)}`).join(''));
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>${esc(def.codigo)} ${esc(def.label)} - ${esc(r.titulo || '')}</title>
 <style>
@@ -917,10 +940,7 @@ async function previewInforme(id){
   ${lista(r.resultados)}
 
   <h2>11) Evaluación de la actuación</h2>
-  <h3>11.1 Fortalezas observadas</h3>
-  ${lista(r.fortalezas)}
-  <h3>11.2 Oportunidades de mejora</h3>
-  ${(r.mejoras || []).some(x => has(x.texto)) ? p(r.mejoras_intro) + lista(r.mejoras) : ''}
+  ${evalHtml}
 
   <h2>12) Conclusión</h2>
   ${p(r.conclusion)}
