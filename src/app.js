@@ -90,7 +90,7 @@ const EN = {
   'Descripción de la sugerencia de mejora':'Improvement Suggestion Description',
   'Descripción del reporte positivo':'Positive Report Description',
   // Portada / gráficos
-  'Registros por tipo':'Records by type','Por estado':'By status','Por instalación':'By site',
+  'Registros por tipo':'Records by type','Por estado':'By status','Por base / departamento':'By base / department',
   'Por severidad':'By severity','Por causa raíz':'By root cause','¿Se llevará a cabo?':'Will it be carried out?',
   'Registros incluidos':'Included records','GRÁFICOS':'CHARTS',
   // KPIs
@@ -99,7 +99,7 @@ const EN = {
   // Firma
   'Visado por Responsable HSQE / DPA':'Approved by HSQE/DPA Manager',
   // Rótulos de la tabla superior (datos)
-  'Cliente / Operación':'Client / Operation','Instalación / Área':'Site / Area','Severidad':'Severity',
+  'Cliente / Operación':'Client / Operation','Base / Departamento · Área':'Base / Department · Area','Severidad':'Severity',
   'Estado actual':'Current status','Responsable':'Responsible','Reportado por':'Reported by',
   'Fecha de vencimiento':'Due date','Fecha de cierre':'Closing date','Referencia normativa':'Regulatory reference',
   'Área responsable':'Responsible area',
@@ -621,7 +621,7 @@ function fixSidebarLayout(){
 function renderSiteSelect(){
   const sel = document.getElementById('siteFilter');
   const sitios = (DATA.companies[0] && DATA.companies[0].vessels) || [];
-  sel.innerHTML = `<option value="ALL">Todos los sitios</option>` +
+  sel.innerHTML = `<option value="ALL">Todas las bases / departamentos</option>` +
     sitios.map(v=>`<option value="${v}">${v}</option>`).join('');
   sel.value = currentSiteFilter;
 }
@@ -1149,7 +1149,7 @@ function getChartSpecs(list, tipo){
     data: statLabels.map(s=>list.filter(r=>r.estado===s).length), colors: statLabels.map(s=>STATUS[s]) };
 
   const sitios = (DATA.companies[0] && DATA.companies[0].vessels) || [];
-  const specInstalacion = { title:'Por instalación', kind:'bar', labels: sitios,
+  const specInstalacion = { title:'Por base / departamento', kind:'bar', labels: sitios,
     data: sitios.map(v=>list.filter(r=>r.instalacion===v).length), colors:['#1C3666'] };
 
   const sevLabels = ['Baja','Media','Alta','Crítica'];
@@ -1388,7 +1388,7 @@ function renderTable(){
 
   const title = currentTypeFilter==='ALL' ? 'Todos los registros' : TYPES[currentTypeFilter].label;
   document.getElementById('viewTitle').textContent = currentTypeFilter==='ALL' ? 'Clean Sea - HSQE Control Panel' : title;
-  const siteName = currentSiteFilter==='ALL' ? 'Todos los sitios' : currentSiteFilter;
+  const siteName = currentSiteFilter==='ALL' ? 'Todas las bases / departamentos' : currentSiteFilter;
   document.getElementById('viewMeta').textContent = `${siteName} · ${list.length} registro(s)`;
 
   const mostrarSeveridad = currentTypeFilter === 'ALL' || TIPOS_CON_SEVERIDAD.includes(currentTypeFilter);
@@ -1462,7 +1462,7 @@ function renderTable(){
   document.getElementById('tableWrap').innerHTML = `
     <table style="font-size:12.5px;">
       <thead><tr>
-        <th>ID</th><th>Tipo</th><th>Instalación</th><th>Fecha</th>
+        <th>ID</th><th>Tipo</th><th>Base / Depto.</th><th>Fecha</th>
         <th>Título</th>${mostrarAlcance ? '<th>INT / EXT</th>' : ''}${mostrarEstado ? '<th>Estado</th><th>Vencimiento</th>' : ''}${mostrarResponsable ? '<th>Responsable</th>' : ''}<th>Adj.</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -1625,7 +1625,7 @@ function renderProgramadosPanel(){
     </div>
     <div style="font-size:12px;color:var(--graphite);margin-bottom:10px;">Cada fila es la próxima repetición pendiente de una Tarea ISO/ISM o Auditoría, o una tarea puntual cargada manualmente. Abrila para atenderla; al marcarla "Cerrado" se genera automáticamente el siguiente Programado (si tiene recurrencia) y esta desaparece de esta lista.</div>
     <div id="tableWrapProgramados"><table>
-      <thead><tr><th>ID</th><th>Título</th><th>Registro madre</th><th>Sitio</th><th>Recurrencia</th><th>Responsable</th><th>Vencimiento</th><th>Estado</th></tr></thead>
+      <thead><tr><th>ID</th><th>Título</th><th>Registro madre</th><th>Base / Depto.</th><th>Recurrencia</th><th>Responsable</th><th>Vencimiento</th><th>Estado</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:var(--graphite-light);padding:20px;">No hay Programados pendientes.</td></tr>'}</tbody>
     </table></div>`;
 }
@@ -1724,7 +1724,7 @@ function renderAll(){
 
   const btn = document.getElementById('printReportBtn');
   if(btn){
-    btn.textContent = currentSiteFilter==='ALL' ? '🖨 Imprimir PDF — Todos los sitios' : `🖨 Imprimir PDF — ${currentSiteFilter}`;
+    btn.textContent = currentSiteFilter==='ALL' ? '🖨 Imprimir PDF — Todas las bases / departamentos' : `🖨 Imprimir PDF — ${currentSiteFilter}`;
   }
 }
 
@@ -1771,7 +1771,7 @@ function openRecordForm(id, forceTipo){
           </div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Buque / Instalación</label>
+          <div class="field"><label>Base / Departamento</label>
             <select id="f_instalacion"></select>
           </div>
           <div class="field"><label id="label_fecha">Fecha ${tipoDescriptor(tipo)}</label>
@@ -3431,11 +3431,11 @@ function sitiosSectionHtml(){
         <input type="file" accept="image/*" onchange="setCompanyLogo(0, this)">
       </div>
     </div>
-    <div class="section-title">Sitios / Buques</div>
-    <div style="font-size:11px;color:var(--graphite-light);margin:-4px 0 8px;">Se usan para filtrar la plataforma y para el reporte PDF por sitio. Marcá cuáles son <b>Buque</b> para los KPI por ámbito (ej. Capacitaciones HSQE en buques).</div>
+    <div class="section-title">Bases / Departamentos</div>
+    <div style="font-size:11px;color:var(--graphite-light);margin:-4px 0 8px;">Se usan para filtrar la plataforma y para el reporte PDF por base / departamento. Marcá cuáles son <b>Buque</b> para los KPI por ámbito (ej. Capacitaciones HSQE en buques).</div>
     ${(ensureSitiosTipo(),'')}
     <div style="margin-bottom:8px;">
-      ${c.vessels.length===0 ? '<span style="font-size:12px;color:var(--graphite-light)">Sin sitios/buques cargados.</span>' :
+      ${c.vessels.length===0 ? '<span style="font-size:12px;color:var(--graphite-light)">Sin bases / departamentos cargados.</span>' :
         c.vessels.map((v,vi)=>`
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px;">
           <span style="flex:1;font-size:13px;color:var(--navy);">${v}</span>
@@ -3446,7 +3446,7 @@ function sitiosSectionHtml(){
         </div>`).join('')}
     </div>
     <div class="field-row">
-      <input type="text" id="newVessel_0" placeholder="Nuevo sitio/buque">
+      <input type="text" id="newVessel_0" placeholder="Nueva base / departamento">
       <button class="btn secondary" onclick="addVessel(0)">+ Agregar</button>
     </div>`;
 }
@@ -3688,7 +3688,7 @@ async function printChartsReport(){
         </tr>
       </table>
       <table style="width:100%;border-collapse:collapse;font-size:9pt;">
-        <tr>${th('ID')}${th('Título')}${th('Registro madre')}${th('Sitio')}${th('Recurrencia')}${th('Responsable')}${th('Vencimiento')}${th('Estado')}</tr>
+        <tr>${th('ID')}${th('Título')}${th('Registro madre')}${th('Base / Depto.')}${th('Recurrencia')}${th('Responsable')}${th('Vencimiento')}${th('Estado')}</tr>
         ${filasHtml || '<tr><td colspan="8" style="border:1px solid #DBE0E6;padding:12px;text-align:center;color:#8B96A1;">Sin Programados pendientes.</td></tr>'}
       </table>
     </div>`;
@@ -3773,7 +3773,7 @@ async function printChartsReport(){
   let kpiHtmlBil = kpiHtml;
   const KPI_TR = {'Registros totales':'Total records','Abiertas / en curso':'Open / in progress','Acciones vencidas':'Overdue actions','Acciones por vencer (30 días)':'Actions due (30 days)'};
   Object.keys(KPI_TR).forEach(es=>{ kpiHtmlBil = kpiHtmlBil.split(es).join(`${es} <span style="font-style:italic;color:#9AA6B2;font-weight:normal;">${KPI_TR[es]}</span>`); });
-  const TH_TR = {'Tipo':'Type','Instalación':'Site','Fecha':'Date','Título':'Title','Estado':'Status','Vencimiento':'Due date','Responsable':'Responsible','Adj.':'Att.'};
+  const TH_TR = {'Tipo':'Type','Base / Depto.':'Base / Dept.','Fecha':'Date','Título':'Title','Estado':'Status','Vencimiento':'Due date','Responsable':'Responsible','Adj.':'Att.'};
   Object.keys(TH_TR).forEach(es=>{ tableHtml = tableHtml.replace(new RegExp('<th([^>]*)>\\s*'+es+'\\s*</th>','g'), `<th$1>${es} <span style="font-style:italic;color:#9AA6B2;font-weight:normal;">${TH_TR[es]}</span></th>`); });
 
   container.innerHTML = `<div class="pr-record">
@@ -3829,7 +3829,7 @@ function printCompanyReport(){
   const sitiosAImprimir = currentSiteFilter === 'ALL' ? todosLosSitios : [currentSiteFilter];
 
   const tituloAlcance = currentSiteFilter === 'ALL'
-    ? `ESTADO POR SITIO — ${empresa ? empresa.name.toUpperCase() : ''}`
+    ? `ESTADO POR BASE / DEPARTAMENTO — ${empresa ? empresa.name.toUpperCase() : ''}`
     : `ESTADO — ${currentSiteFilter.toUpperCase()}`;
 
   const logoPrincipal = empresa ? getCompanyLogo(empresa.id) : null;
@@ -3864,7 +3864,7 @@ function printCompanyReport(){
       </div>`;
 
     if(recs.length === 0){
-      html += `<div class="pr-empty">Sin registros cargados para este sitio.</div>`;
+      html += `<div class="pr-empty">Sin registros cargados para esta base / departamento.</div>`;
     } else {
       const sorted = [...recs].sort((a,b)=>{
         const wA = !esCerrado(a.estado) ? 0 : 1;
@@ -3957,7 +3957,7 @@ async function composeRecordBody(id){
   // Tabla de datos: la severidad solo aparece en los tipos que la usan.
   const metaCells = [
     {l:'Cliente / Operación', v:r.cliente_operacion||'—'},
-    {l:'Instalación / Área', v:(r.instalacion||'—')+(r.area?' · '+r.area:'')},
+    {l:'Base / Departamento · Área', v:(r.instalacion||'—')+(r.area?' · '+r.area:'')},
     {l:'Fecha '+tipoDescriptor(r.tipo), v:fmtDate(r.fecha)},
   ];
   if(r.tipo==='CAP'){

@@ -139,7 +139,7 @@ export function renderInformesPanel(tipo){
   const q = panelSearch.trim().toLowerCase();
   if(q) list = list.filter(r => `${r.titulo} ${r.ubicacion} ${r.cliente_operacion} ${r.instalacion} ${ctx.codigoMostrado(r)}`.toLowerCase().includes(q));
   list.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.id || '').localeCompare(a.id || ''));
-  document.getElementById('viewMeta').textContent = `Formulario ${def.codigo} · ${site === 'ALL' ? 'Todos los sitios' : site} · ${list.length} informe(s)`;
+  document.getElementById('viewMeta').textContent = `Formulario ${def.codigo} · ${site === 'ALL' ? 'Todas las bases / departamentos' : site} · ${list.length} informe(s)`;
 
   const finalizados = list.filter(r => ctx.esCerrado(r.estado)).length;
   const rows = list.map(r => {
@@ -176,9 +176,9 @@ export function renderInformesPanel(tipo){
     </div>
     <div id="tableWrapInformes">
       ${list.length ? `<table style="font-size:12.5px;">
-        <thead><tr><th>Código</th><th>Título</th><th>Ubicación</th><th>Fecha</th><th>Cliente / Operación</th><th>Sitio</th><th>Estado</th><th>Fotos</th><th></th></tr></thead>
+        <thead><tr><th>Código</th><th>Título</th><th>Ubicación</th><th>Fecha</th><th>Cliente / Operación</th><th>Base / Departamento</th><th>Estado</th><th>Fotos</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>` : `<div class="empty-state"><div class="display">Sin informes</div><div>Todavía no hay informes ${esc(def.codigo)} cargados${site !== 'ALL' ? ' para este sitio' : ''}.</div></div>`}
+      </table>` : `<div class="empty-state"><div class="display">Sin informes</div><div>Todavía no hay informes ${esc(def.codigo)} cargados${site !== 'ALL' ? ' para esta base / departamento' : ''}.</div></div>`}
     </div>`;
 }
 function infPanelSearch(v){
@@ -356,7 +356,7 @@ function renderForm(){
         <div class="field"><label>Cliente / Operación</label>
           <select onchange="infSet('cliente_operacion',this.value)">${clientes.map(c => `<option ${c === F.cliente_operacion ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
         </div>
-        <div class="field"><label>Sitio / Base</label>
+        <div class="field"><label>Base / Departamento</label>
           <select onchange="infSet('instalacion',this.value)">${[...new Set([...sitios, F.instalacion].filter(Boolean))].map(s => `<option ${s === F.instalacion ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
         </div>
         ${txt('elaborado_por', 'Elaborado por', 'Nombre y apellido', { list: 'personasDatalist' })}
